@@ -60,6 +60,7 @@ export default function Interview() {
         setCurrentTopic(data.currentTopic);
         setProgress(data.progress);
         setAllTopicsCovered(data.allTopicsCovered);
+        if (data.questions?.length) setQuestions(data.questions);
 
         if (data.status === 'approved' || data.status === 'published') {
           setStep('done');
