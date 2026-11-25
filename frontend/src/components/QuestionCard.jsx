@@ -1,70 +1,84 @@
-import { useState, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
-function speak(text) {
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'lv-LV';
-  utterance.rate = 0.95;
-  return utterance;
-}
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 export default function QuestionCard({ question, value, onChange, onSubmit, submitting }) {
-  const [speaking, setSpeaking] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
 
-  const toggleSpeak = useCallback(() => {
-    if (!window.speechSynthesis) return;
-    if (speaking) {
-      window.speechSynthesis.cancel();
-      setSpeaking(false);
+  const toggleListen = useCallback(() => {
+    if (!SpeechRecognition) return;
+
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setListening(false);
       return;
     }
-    const utterance = speak(question);
-    if (!utterance) return;
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    setSpeaking(true);
-    window.speechSynthesis.speak(utterance);
-  }, [question, speaking]);
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'lv-LV';
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (event) => {
+      let final = '';
+      let interim = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript + ' ';
+        } else {
+          interim += transcript;
+        }
+      }
+      if (final) {
+        onChange((prev) => (prev ? prev + ' ' + final.trim() : final.trim()));
+      }
+    };
+
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+
+    setListening(true);
+    recognition.start();
+  }, [listening, onChange]);
 
   return (
     <div className="card mb-4">
-      <div className="flex items-start gap-2 mb-3">
-        <p className="text-lg font-medium flex-1">{question}</p>
-        <button
-          type="button"
-          onClick={toggleSpeak}
-          className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
-            speaking
-              ? 'bg-primary/20 text-primary'
-              : 'bg-white/5 text-white/50 hover:text-white hover:bg-white/10'
-          }`}
-          aria-label={speaking ? 'Apturēt' : 'Noklausīties jautājumu'}
-          title={speaking ? 'Apturēt' : 'Noklausīties'}
-        >
-          {speaking ? (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path d="M5.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75A.75.75 0 0 0 7.25 3h-1.5ZM12.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75a.75.75 0 0 0-.75-.75h-1.5Z" />
+      <p className="text-lg font-medium mb-3">{question}</p>
+      <div className="flex gap-3 items-start">
+        <div className="flex-1 relative">
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Ieraksti vai iesaki atbildi..."
+            rows={3}
+            className="w-full bg-navy border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+            aria-label={`Atbilde: ${question}`}
+          />
+          <span className="absolute bottom-2 right-3 text-xs text-white/30">
+            {value.length}
+          </span>
+        </div>
+        {SpeechRecognition && (
+          <button
+            type="button"
+            onClick={toggleListen}
+            className={`shrink-0 w-12 h-12 flex items-center justify-center rounded-full transition-colors ${
+              listening
+                ? 'bg-red-500/20 text-red-400 animate-pulse'
+                : 'bg-white/5 text-white/50 hover:text-white hover:bg-white/10'
+            }`}
+            aria-label={listening ? 'Apturēt ierakstu' : 'Runāt atbildi'}
+            title={listening ? 'Apturēt' : 'Mikrofons'}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-6 h-6">
+              <path d="M7 4a3 3 0 0 1 6 0v6a3 3 0 1 1-6 0V4Z" />
+              <path d="M5.5 9.643a.75.75 0 0 0-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.546A6.001 6.001 0 0 0 16 10v-.357a.75.75 0 0 0-1.5 0V10a4.5 4.5 0 0 1-9 0v-.357Z" />
             </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path d="M10.5 3.75a.75.75 0 0 0-1.264-.546L5.203 7H2.667a.75.75 0 0 0-.7.48A6.985 6.985 0 0 0 1.5 10c0 .887.165 1.737.468 2.52.111.29.39.48.7.48h2.535l4.033 3.796A.75.75 0 0 0 10.5 16.25V3.75ZM13.329 7.212a.75.75 0 0 1 1.06.028A4.991 4.991 0 0 1 15.5 10a4.99 4.99 0 0 1-1.111 2.76.75.75 0 0 1-1.088-1.032A3.49 3.49 0 0 0 14 10a3.49 3.49 0 0 0-.699-1.728.75.75 0 0 1 .028-1.06Z" />
-            </svg>
-          )}
-        </button>
-      </div>
-      <div className="relative">
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Ieraksti savu atbildi..."
-          rows={3}
-          className="w-full bg-navy border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-          aria-label={`Atbilde: ${question}`}
-        />
-        <span className="absolute bottom-2 right-3 text-xs text-white/30">
-          {value.length}
-        </span>
+          </button>
+        )}
       </div>
       {onSubmit && (
         <div className="flex justify-end mt-3">
