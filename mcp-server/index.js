@@ -1,3 +1,4 @@
+import dotenv from "dotenv";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import Database from "better-sqlite3";
@@ -8,6 +9,7 @@ import { z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, "..", ".env") });
 const dbPath = join(__dirname, "..", "interview.db");
 
 // --- Database helpers ---
@@ -446,14 +448,22 @@ async function main() {
 
     const app = express();
     const port = parseInt(process.env.MCP_PORT, 10) || 3102;
+    const token = process.env.MCP_TOKEN;
     let transport;
 
-    app.get("/sse", async (req, res) => {
+    function checkAuth(req, res, next) {
+      if (!token) return next();
+      const auth = req.headers.authorization;
+      if (auth === `Bearer ${token}`) return next();
+      res.status(401).json({ error: "Unauthorized" });
+    }
+
+    app.get("/sse", checkAuth, async (req, res) => {
       transport = new SSEServerTransport("/messages", res);
       await server.connect(transport);
     });
 
-    app.post("/messages", async (req, res) => {
+    app.post("/messages", checkAuth, async (req, res) => {
       if (!transport) return res.status(400).json({ error: "No active SSE connection" });
       await transport.handlePostMessage(req, res);
     });
