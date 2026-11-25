@@ -440,8 +440,31 @@ server.resource(
 // --- Start ---
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  if (process.argv.includes("--http")) {
+    const { SSEServerTransport } = await import("@modelcontextprotocol/sdk/server/sse.js");
+    const express = (await import("express")).default;
+
+    const app = express();
+    const port = parseInt(process.env.MCP_PORT, 10) || 3102;
+    let transport;
+
+    app.get("/sse", async (req, res) => {
+      transport = new SSEServerTransport("/messages", res);
+      await server.connect(transport);
+    });
+
+    app.post("/messages", async (req, res) => {
+      if (!transport) return res.status(400).json({ error: "No active SSE connection" });
+      await transport.handlePostMessage(req, res);
+    });
+
+    app.listen(port, () => {
+      process.stderr.write(`MCP server (HTTP/SSE) listening on http://localhost:${port}\n`);
+    });
+  } else {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  }
 }
 
 main().catch((err) => {
