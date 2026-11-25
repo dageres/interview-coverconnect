@@ -1,0 +1,12 @@
+{
+  "name": "interview-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "better-sqlite3": "^11.7.0",
+    "zod": "^3.23.0"
+  }
+}
