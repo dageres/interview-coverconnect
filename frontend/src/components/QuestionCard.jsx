@@ -4,7 +4,10 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 
 export default function QuestionCard({ question, value, onChange, onSubmit, submitting }) {
   const [listening, setListening] = useState(false);
+  const [interim, setInterim] = useState('');
   const recognitionRef = useRef(null);
+  const committedRef = useRef(value);
+  committedRef.current = value;
 
   const toggleListen = useCallback(() => {
     if (!SpeechRecognition) return;
@@ -12,6 +15,7 @@ export default function QuestionCard({ question, value, onChange, onSubmit, subm
     if (listening && recognitionRef.current) {
       recognitionRef.current.stop();
       setListening(false);
+      setInterim('');
       return;
     }
 
@@ -22,27 +26,32 @@ export default function QuestionCard({ question, value, onChange, onSubmit, subm
     recognitionRef.current = recognition;
 
     recognition.onresult = (event) => {
-      let final = '';
-      let interim = '';
+      let finalText = '';
+      let interimText = '';
       for (let i = 0; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          final += transcript + ' ';
+          finalText += transcript + ' ';
         } else {
-          interim += transcript;
+          interimText += transcript;
         }
       }
-      if (final) {
-        onChange((prev) => (prev ? prev + ' ' + final.trim() : final.trim()));
+      if (finalText) {
+        onChange((prev) => (prev ? prev + ' ' + finalText.trim() : finalText.trim()));
+        setInterim(interimText);
+      } else {
+        setInterim(interimText);
       }
     };
 
-    recognition.onerror = () => setListening(false);
-    recognition.onend = () => setListening(false);
+    recognition.onerror = () => { setListening(false); setInterim(''); };
+    recognition.onend = () => { setListening(false); setInterim(''); };
 
     setListening(true);
     recognition.start();
   }, [listening, onChange]);
+
+  const displayValue = interim ? (value ? value + ' ' + interim : interim) : value;
 
   return (
     <div className="card mb-4">
@@ -50,13 +59,18 @@ export default function QuestionCard({ question, value, onChange, onSubmit, subm
       <div className="flex gap-3 items-start">
         <div className="flex-1 relative">
           <textarea
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
+            value={displayValue}
+            onChange={(e) => { onChange(e.target.value); setInterim(''); }}
             placeholder="Ieraksti vai iesaki atbildi..."
             rows={3}
             className="w-full bg-navy border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
             aria-label={`Atbilde: ${question}`}
           />
+          {interim && (
+            <span className="absolute top-1 right-3 text-xs text-primary/60 animate-pulse">
+              klausos...
+            </span>
+          )}
           <span className="absolute bottom-2 right-3 text-xs text-white/30">
             {value.length}
           </span>
@@ -84,7 +98,7 @@ export default function QuestionCard({ question, value, onChange, onSubmit, subm
         <div className="flex justify-end mt-3">
           <button
             type="button"
-            onClick={() => onSubmit('text')}
+            onClick={() => onSubmit(listening ? 'voice' : 'text')}
             disabled={submitting || !value.trim()}
             className="btn-primary disabled:opacity-50"
           >
