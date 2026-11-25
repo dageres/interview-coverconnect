@@ -1,6 +1,12 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.LLM_API_KEY,
+  baseURL: process.env.LLM_BASE_URL || 'http://192.168.0.22:8317/v1',
+});
+
+const QUESTION_MODEL = process.env.LLM_QUESTION_MODEL || 'claude-haiku-5-5';
+const PROFILE_MODEL = process.env.LLM_PROFILE_MODEL || 'claude-sonnet-5-5';
 
 const TOPICS = [
   { key: 'intro', label: 'Quick introduction' },
@@ -33,7 +39,7 @@ export async function generateQuestions(topic, previousAnswers, language = 'lv')
   const context = buildContext(previousAnswers);
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: QUESTION_MODEL,
     max_tokens: 800,
     messages: [
       { role: 'system', content: INTERVIEWER_SYSTEM },
@@ -64,7 +70,7 @@ export async function generateFollowUp(topic, lastAnswer, previousAnswers) {
   const context = buildContext(previousAnswers);
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: QUESTION_MODEL,
     max_tokens: 600,
     messages: [
       {
@@ -96,7 +102,7 @@ export async function generateProfile(allAnswers, participantName) {
   const context = buildContext(allAnswers);
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: PROFILE_MODEL,
     max_tokens: 2000,
     messages: [
       {
